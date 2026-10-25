@@ -1,6 +1,6 @@
 // The invoice layout editor: drag blocks around a real page, restyle them,
 // and see exactly what the PDF will look like.
-import { db, save, nextNumber } from '../store.js';
+import { db, save, nextNumber, touchTemplate } from '../store.js';
 import { esc, uid, today, addDays } from '../util.js';
 import { layout, drawPage, preloadImages, presetTemplate, newBlock, BLOCK_TYPES, PAGES, MARGIN, FONTS } from '../layout.js';
 import { header, icon, actionSheet, confirmSheet, toast } from '../ui.js';
@@ -39,7 +39,7 @@ export default function designer({ main }) {
   // where a block actually ended up (it may have been pushed down by the block above it)
   const placedY = (blk) => { const b = lay && lay.boxes.find((x) => x.id === blk.id); return b && blk.type !== 'footer' ? b.y : blk.y; };
   const snapshot = () => { undo.push(JSON.stringify(tpl)); if (undo.length > 60) undo.shift(); };
-  const commit = (() => { let t; return () => { clearTimeout(t); t = setTimeout(save, 300); }; })();
+  const commit = (() => { let t; return () => { touchTemplate(); clearTimeout(t); t = setTimeout(save, 300); }; })();
 
   header({
     title: 'Invoice layout', large: false, back: 'history',

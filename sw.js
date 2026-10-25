@@ -1,8 +1,8 @@
 // Offline cache for the app shell. Bump VERSION when files change.
-const VERSION = 'tally-v7';
+const VERSION = 'tally-v8';
 const FILES = [
   './', 'index.html', 'privacy.html', 'terms.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/util.js', 'js/store.js', 'js/layout.js', 'js/pdf.js', 'js/importer.js', 'js/ui.js', 'js/gmail.js', 'js/shortcut.js',
+  'js/app.js', 'js/util.js', 'js/store.js', 'js/layout.js', 'js/pdf.js', 'js/importer.js', 'js/ui.js', 'js/gmail.js', 'js/shortcut.js', 'js/sync.js', 'js/views/sync.js',
   'js/views/home.js', 'js/views/invoices.js', 'js/views/invoice-view.js', 'js/views/editor.js', 'js/views/designer.js',
   'js/views/clients.js', 'js/views/items.js', 'js/views/import.js', 'js/views/settings.js', 'js/views/share.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',

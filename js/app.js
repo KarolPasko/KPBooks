@@ -9,6 +9,8 @@ import clients, { clientEdit } from './views/clients.js';
 import items from './views/items.js';
 import importView from './views/import.js';
 import more, { settings } from './views/settings.js';
+import syncView from './views/sync.js';
+import { startAutoSync } from './sync.js';
 
 const routes = [
   [/^\/?$/, home, 'home'],
@@ -22,6 +24,7 @@ const routes = [
   [/^\/design$/, designer, null],
   [/^\/import$/, importView, 'more'],
   [/^\/more$/, more, 'more'],
+  [/^\/sync$/, syncView, 'more'],
   [/^\/settings(?:\/(\w+))?$/, settings, 'more'],
 ];
 
@@ -98,6 +101,14 @@ async function route() {
 }
 
 window.addEventListener('hashchange', route);
+// another device changed something: refresh the screen (unless you're mid-edit)
+window.addEventListener('sync-changed', () => {
+  if (current && current.canLeave) return;
+  if (/^#\/(design|sync)/.test(location.hash)) return;
+  route();
+  toast('Updated from iCloud');
+});
+startAutoSync();
 window.addEventListener('store-error', () => toast('Could not save — your device storage may be full.', 'bad'));
 
 // First run: send people to set up their business details.

@@ -42,7 +42,7 @@
   <section class="summary">
     <h2>The short version</h2>
     <ul>
-      <li>Tally Invoices has <b>no servers, no accounts and no database</b>. Everything you enter — your business details, clients, invoices and prices — is stored <b>only on your own device</b>.</li>
+      <li>Tally Invoices has <b>no servers, no accounts and no database</b>. Everything you enter — your business details, clients, invoices and prices — is stored <b>only on your own device</b> — and, if you turn on iCloud Sync, in <b>your own private iCloud</b>.</li>
       <li>We do <b>not</b> collect, receive, sell or share any of your data. There are no analytics, no advertising, no cookies and no tracking.</li>
       <li>If you choose to connect Gmail, Tally uses Google's permission <b>only to send the invoice emails you ask it to send</b>, directly from your device to Google. It cannot read your email.</li>
     </ul>
@@ -61,7 +61,7 @@
       <li>your clients' details (name, contact person, email address, phone number, postal address, tax/VAT number, private notes);</li>
       <li>invoices and line items (descriptions, quantities, prices, dates, notes and terms), and invoices you import from your own PDF or CSV files.</li>
     </ul>
-    <p><b>Where it is stored:</b> only in your browser's local storage on the device you are using. It is never uploaded to us or to any server we operate — we do not operate any. Imported PDF and CSV files are read on your device and are not uploaded anywhere.</p>
+    <p><b>Where it is stored:</b> in your browser's local storage on the device you are using, and — only if you turn on iCloud Sync — in your own private iCloud database (see section 4). It is never uploaded to us or to any server we operate — we do not operate any. Imported PDF and CSV files are read on your device and are not uploaded anywhere.</p>
     <p><b>How it is used:</b> only to show your data in the app and to produce your invoices and PDFs.</p>
     <p><b>Who can see it:</b> only people with access to your device. We cannot see, access or recover it.</p>
     <p><b>Backups:</b> if you use “Back up everything”, a backup file is saved wherever you choose (for example the Files app or iCloud Drive). That file is then handled under the terms of the storage service you chose.</p>
@@ -110,7 +110,14 @@
   </section>
 
   <section>
-    <h2>4. Third-party services</h2>
+    <h2>4. iCloud Sync (optional)</h2>
+    <p>If you turn on iCloud Sync and sign in with your Apple ID, a copy of your Tally data (business details, clients, invoices, price book, layout and settings) is stored in the <b>private database</b> of your iCloud account using Apple's CloudKit service, so your other devices signed in with the same Apple ID can download it. Only your Apple ID can access your private database — the developer cannot read it. Storage and processing by Apple are covered by the <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a>. Apple's CloudKit script is loaded from <code>cdn.apple-cloudkit.com</code> only when iCloud Sync is set up.</p>
+    <p>If you use a <b>sync file</b> instead, the file is saved wherever you choose (for example iCloud Drive) and handled under that service's terms.</p>
+    <p>To stop syncing, sign out on the iCloud Sync screen. To delete the synced copy, use <b>More → Erase all data</b> while signed in (the erase syncs to iCloud), or manage your iCloud data in your Apple ID settings.</p>
+  </section>
+
+  <section>
+    <h2>5. Third-party services</h2>
     <ul>
       <li><b>GitHub Pages</b> hosts the app's files. When your browser downloads the app, GitHub may process technical information such as your IP address under the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>. We do not receive this information.</li>
       <li><b>Google</b> provides sign-in and the Gmail API, used only if you connect Gmail. Your use of them is covered by the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>. Google's sign-in script is loaded from <code>accounts.google.com</code> only when you use the Gmail feature.</li>
@@ -120,33 +127,33 @@
   </section>
 
   <section>
-    <h2>5. Deleting your data</h2>
+    <h2>6. Deleting your data</h2>
     <p>Because all data is stored on your device, you are fully in control of it:</p>
     <ul>
       <li>Delete individual invoices, clients or items in the app.</li>
       <li>Use <b>More → Erase all data</b> to delete everything the app has stored on the device.</li>
       <li>Clearing your browser's website data for this site, or removing the app from your Home Screen, also deletes it.</li>
     </ul>
-    <p>We hold no copy of your data, so there is nothing for us to delete on our side.</p>
+    <p>We hold no copy of your data, so there is nothing for us to delete on our side. If iCloud Sync is on, the copy in your iCloud is removed as described in section 4.</p>
   </section>
 
   <section>
-    <h2>6. Security</h2>
+    <h2>7. Security</h2>
     <p>All connections to the app and to Google use HTTPS encryption. Google access tokens are short-lived and limited to sending email. Your data's security on the device depends on your device's own protection, so we recommend keeping a passcode on your device.</p>
   </section>
 
   <section>
-    <h2>7. Children</h2>
+    <h2>8. Children</h2>
     <p>Tally is a business tool and is not directed at children under 13 (or the minimum age in your country). We do not knowingly collect information from children.</p>
   </section>
 
   <section>
-    <h2>8. Changes to this policy</h2>
+    <h2>9. Changes to this policy</h2>
     <p>If this policy changes, the updated version will be published on this page with a new effective date. Significant changes to how Google user data is used will be made only after asking for your consent again.</p>
   </section>
 
   <section>
-    <h2>9. Contact</h2>
+    <h2>10. Contact</h2>
     <p>Questions about this policy or your data can be raised at <a href="https://github.com/KarolPasko/VSO/issues">github.com/KarolPasko/VSO/issues</a>.</p>
   </section>
 

@@ -1,4 +1,4 @@
-import { db, save, replaceAll, loadDemo, formatNumber, newInvoice } from '../store.js';
+import { db, save, replaceAll, loadDemo, formatNumber, newInvoice, touchSettings, eraseAll } from '../store.js';
 import { shortcutPayload, runShortcut } from '../shortcut.js';
 import { makePdf } from './share.js';
 import { gmailAccount, loadGis, getToken, disconnectGmail, sendWithGmail } from '../gmail.js';
@@ -11,6 +11,7 @@ export default function more({ main }) {
   main.innerHTML = `
     <div class="pad">
       <div class="card list">
+        <a class="row" href="#/sync"><span class="row-ic sky">${icon('cloud')}</span><span class="row-main"><span class="row-title">iCloud Sync</span><span class="row-sub">${db.settings.ckContainer ? 'On — iPhone and Mac stay in step' : 'Sync between your iPhone and Mac'}</span></span><span class="chev">${icon('chev')}</span></a>
         <a class="row" href="#/items"><span class="row-ic blue">${icon('tag')}</span><span class="row-main"><span class="row-title">Price book</span><span class="row-sub">Saved items & prices that auto-fill</span></span>${n(db.items.length)}<span class="chev">${icon('chev')}</span></a>
         <a class="row" href="#/design"><span class="row-ic violet">${icon('layout')}</span><span class="row-main"><span class="row-title">Invoice layout</span><span class="row-sub">Design how your invoices look</span></span><span class="chev">${icon('chev')}</span></a>
         <a class="row" href="#/import"><span class="row-ic teal">${icon('upload')}</span><span class="row-main"><span class="row-title">Import past invoices</span><span class="row-sub">PDF, CSV, pasted text or by hand</span></span><span class="chev">${icon('chev')}</span></a>
@@ -51,7 +52,7 @@ export default function more({ main }) {
   main.querySelector('#demo').onclick = () => { loadDemo(); toast('Demo data added'); location.hash = '#/'; };
   main.querySelector('#erase').onclick = async () => {
     if (!(await confirmSheet('Delete every invoice, client, item and setting on this device? Make a backup first if you might need them.', { ok: 'Erase everything', danger: true }))) return;
-    replaceAll({});
+    eraseAll();
     toast('All data erased');
     location.hash = '#/settings/welcome';
   };
@@ -193,6 +194,7 @@ export function settings({ params, main }) {
     s.dueDays = Math.max(0, Math.floor(num(f.dueDays)));
     s.taxRate = num(f.taxRate);
     s.onboarded = true;
+    touchSettings();
     save();
     toast('Settings saved');
     location.hash = welcome ? '#/' : '#/more';

@@ -635,3 +635,16 @@ body.no-tabs #view.with-footer { padding-bottom: calc(var(--safe-b) + 110px); }
 .page-thumb { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 20px; background: var(--surface); }
 .page-thumb img { width: 64px; aspect-ratio: 1 / 1.414; border-radius: 4px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); -webkit-touch-callout: default; object-fit: cover; }
 .btn-row.two > .btn { flex: 1; }
+
+/* ---------- iCloud sync ---------- */
+.row-ic.sky { background: linear-gradient(160deg, #5ac8fa, #0a84ff); }
+.sync-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 26px 20px 20px; margin-top: 6px; }
+.sync-cloud { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; color: #fff; margin-bottom: 8px; background: linear-gradient(160deg, #a3abb9, #737c8c); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3); transition: background .3s; }
+.sync-cloud .ic { width: 40px; height: 40px; }
+.sync-cloud.st-ready, .sync-cloud.st-syncing { background: linear-gradient(160deg, #5ac8fa, #0a84ff); }
+.sync-cloud.st-error { background: linear-gradient(160deg, #ff6b61, #e5302a); }
+.sync-cloud.st-syncing .ic, .sync-cloud.st-connecting .ic { animation: pulse 1.2s infinite; }
+.sync-state { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.ck-buttons { display: flex; justify-content: center; margin-top: 10px; }
+.ck-buttons:empty, .ck-buttons > div:empty { display: none; }
+#sync-now { margin-top: 12px; }

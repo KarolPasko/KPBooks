@@ -34,6 +34,7 @@ const blank = () => ({
   clients: [],
   invoices: [],
   items: [],
+  deleted: {}, // id -> time it was deleted, so deletions sync to other devices
 });
 
 export const db = load();
@@ -52,10 +53,11 @@ function load() {
 }
 
 let saveError = null;
-export function save() {
+export function save({ fromSync = false } = {}) {
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
     saveError = null;
+    if (!fromSync) window.dispatchEvent(new CustomEvent('store-saved'));
   } catch (e) {
     saveError = e;
     window.dispatchEvent(new CustomEvent('store-error', { detail: e }));
@@ -71,6 +73,21 @@ applyFormat();
 
 // Ask Safari to keep our storage around (helps on iOS).
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch { /* ignore */ }
+
+// Mark settings / layout as changed "now" so the newest version wins when syncing.
+export function touchSettings() { db.settings.updatedAt = Date.now(); }
+export function touchTemplate() { db.template.updatedAt = Date.now(); }
+
+// Erase everything, recording deletions so synced devices erase too.
+export function eraseAll() {
+  const now = Date.now();
+  const deleted = { ...db.deleted };
+  for (const k of ['invoices', 'clients', 'items']) for (const x of db[k]) deleted[x.id] = now;
+  replaceAll({ deleted });
+  touchSettings();
+  touchTemplate();
+  save();
+}
 
 export function replaceAll(data) {
   const fresh = blank();
@@ -93,6 +110,7 @@ export function newClient(partial = {}) {
   };
 }
 export function upsertClient(c) {
+  c.updatedAt = Date.now();
   const i = db.clients.findIndex((x) => x.id === c.id);
   if (i >= 0) db.clients[i] = c; else db.clients.push(c);
   // keep snapshots on unpaid invoices in sync
@@ -102,6 +120,7 @@ export function upsertClient(c) {
 }
 export function deleteClient(id) {
   db.clients = db.clients.filter((c) => c.id !== id);
+  db.deleted[id] = Date.now();
   save();
 }
 export function findClientByName(name, email) {
@@ -176,6 +195,7 @@ export function upsertInvoice(inv) {
 
 export function deleteInvoice(id) {
   db.invoices = db.invoices.filter((i) => i.id !== id);
+  db.deleted[id] = Date.now();
   save();
 }
 
@@ -191,6 +211,7 @@ export function newItem(partial = {}) {
   return { id: uid(), name: '', description: '', unit: '', price: 0, uses: 0, lastUsed: null, history: [], source: 'manual', ...partial };
 }
 export function upsertItem(it) {
+  it.updatedAt = Date.now();
   const i = db.items.findIndex((x) => x.id === it.id);
   if (i >= 0) db.items[i] = it; else db.items.push(it);
   save();
@@ -198,6 +219,7 @@ export function upsertItem(it) {
 }
 export function deleteItem(id) {
   db.items = db.items.filter((i) => i.id !== id);
+  db.deleted[id] = Date.now();
   save();
 }
 
@@ -219,6 +241,7 @@ function learnPrices(inv) {
     it.lastUsed = latest.date;
     it.uses = it.history.length;
     if (!it.description && line.description) it.description = line.description;
+    it.updatedAt = Date.now();
   }
 }
 
