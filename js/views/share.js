@@ -183,70 +183,88 @@ export function sendSheet(inv, onDone) {
   });
 }
 
-// "Attach it yourself": a draggable PDF, a copyable page image, and the steps
-// to add the PDF inside the Mail app.
+// "Attach it yourself": step 1 downloads the PDF, step 2 explains how to drag
+// the downloaded file (a real file the system can drop) into the email.
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const isMacSafari = () => /Macintosh/.test(navigator.userAgent) && !isIOS() && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent);
+
 function attachSheet(inv, file, mailto, onOpened) {
-  const pdfUrl = URL.createObjectURL(file);
-  let imgBlob = null;
+  const ios = isIOS();
+  const macSafari = isMacSafari();
+  const name = esc(file.name);
+  const howTo = ios
+    ? `<ol class="steps tight">
+        <li>Tap <b>Open Mail</b> — the address, subject and message are filled in.</li>
+        <li><b>Drag &amp; drop:</b> tap <b>Open Files</b> → <b>Downloads</b>, press and hold <b>${name}</b> until it lifts, then with another finger swipe up and open <b>Mail</b> — drop it into the email.</li>
+        <li><b>Or attach:</b> in the email, tap the <b>‹</b> bar above the keyboard → <b>paperclip / document</b> icon → <b>Downloads</b> (or Recents) → <b>${name}</b>.</li>
+      </ol>`
+    : macSafari
+      ? `<ol class="steps tight">
+        <li>Click <b>Open Mail</b> — a new email opens with everything filled in.</li>
+        <li>In Safari's toolbar click the <b>Downloads</b> button (the ⬇︎ arrow, top right).</li>
+        <li>Drag <b>${name}</b> from that list straight into the email. It goes in as a PDF attachment.</li>
+      </ol>`
+      : `<ol class="steps tight">
+        <li>Click <b>Open Mail</b>.</li>
+        <li>Drag <b>${name}</b> from your browser's downloads bar or Downloads folder into the email — or drag the card below.</li>
+      </ol>`;
   sheet({
     title: 'Add the PDF to your email',
     tall: true,
-    onClose: () => setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000),
     body: `
-      <p class="hint">Drag the invoice into your email, or save it and attach it from Mail. Mail opens with the address, subject and message already filled in.</p>
-      <div class="attach-drop">
-        <div class="pdf-chip" id="a-pdf">
-          <span class="pdf-ic" id="a-badge">PDF</span>
-          <img class="pdf-drag" id="a-pdfimg" alt="${esc(file.name)}" hidden>
-          <span class="pdf-meta"><b>${esc(file.name)}</b><span class="muted small" id="a-hint">${Math.max(1, Math.round(file.size / 1024))} KB · drag me into the email</span></span>
-        </div>
-        <div class="page-thumb"><img id="a-img" alt="Invoice ${esc(inv.number)}" draggable="true"><span class="muted small">Page image — drag, or copy &amp; paste</span></div>
-      </div>
-      <div class="btn-col">
-        <button class="btn primary block" id="a-open">${icon('mail')} Open Mail</button>
-        <div class="btn-row tight two">
-          <button class="btn sm" id="a-save">${icon('download')} Save PDF to Files</button>
-          <button class="btn sm" id="a-copy" disabled>${icon('copy')} Copy page image</button>
+      <div class="step card" id="st1">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <b>Download the PDF</b>
+          <span class="muted small" id="st1-note">${name} · ${Math.max(1, Math.round(file.size / 1024))} KB</span>
+          <button class="btn primary sm" id="a-dl">${icon('download')} Download PDF</button>
         </div>
       </div>
-      <div class="group-label">On iPhone</div>
-      <ol class="steps">
-        <li>Tap <b>Save PDF to Files</b> (choose <i>Save to Files</i> if asked).</li>
-        <li>Tap <b>Open Mail</b>. In the new email, tap where you want the attachment, then tap the <b>‹</b> / <b>Aa</b> bar above the keyboard → <b>paperclip / document</b> icon → <b>Recents</b> → pick <b>${esc(file.name)}</b>.</li>
-        <li><i>Or drag & drop:</i> press and hold the PDF card above until it lifts, and with another finger swipe up to switch to Mail — drop it into the email.</li>
-        <li><i>Quickest (as an image):</i> tap <b>Copy page image</b>, then in the email tap and hold → <b>Paste</b>.</li>
-      </ol>
-      <p class="hint">On a computer you can drag the PDF card straight into an email or onto your desktop.</p>`,
+      <div class="step card off" id="st2">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <b>Drag the downloaded PDF into your email</b>
+          ${howTo}
+          <div class="btn-row tight">
+            <button class="btn sm primary" id="a-open">${icon('mail')} Open Mail</button>
+            ${ios ? `<a class="btn sm" href="shareddocuments://" id="a-files">${icon('file')} Open Files</a>` : ''}
+          </div>
+          ${!ios && !macSafari ? `<div class="pdf-chip" id="a-pdf" draggable="true"><span class="pdf-ic">PDF</span><span class="pdf-meta"><b>${name}</b><span class="muted small">or drag this card into the email</span></span></div>` : ''}
+        </div>
+      </div>
+      <details class="raw">
+        <summary>Prefer a picture of the invoice?</summary>
+        <div class="page-thumb"><img id="a-img" alt="Invoice ${esc(inv.number)}"><button class="btn sm" id="a-copy" disabled>${icon('copy')} Copy page image</button></div>
+        <p class="hint">Copy it, then press and hold in the email and choose <b>Paste</b>.</p>
+      </details>`,
     onMount(el) {
-      const chip = el.querySelector('#a-pdf');
-      const pdfImg = el.querySelector('#a-pdfimg');
-      // Safari (iPhone, iPad, Mac) can show a PDF in an <img>. Dragging that
-      // image hands over the actual PDF file, not a link — so when it loads,
-      // the PDF thumbnail itself becomes the thing you drag.
-      pdfImg.onload = () => {
-        pdfImg.hidden = false;
-        pdfImg.draggable = true;
-        el.querySelector('#a-badge').hidden = true;
-        el.querySelector('#a-hint').textContent = 'Press and hold the page, then drag it into the email';
-        chip.classList.add('native');
+      const st2 = el.querySelector('#st2');
+      el.querySelector('#a-dl').onclick = (e) => {
+        downloadBlob(file, file.name);
+        el.querySelector('#st1').classList.add('done');
+        el.querySelector('#st1-note').textContent = ios ? `Saved ${file.name} — if asked, tap Download` : `Downloaded ${file.name}`;
+        e.currentTarget.innerHTML = `${icon('check')} Downloaded`;
+        e.currentTarget.classList.remove('primary');
+        st2.classList.remove('off');
       };
-      // Other browsers (Chrome, Edge…): attach the real file to the drag ourselves.
-      pdfImg.onerror = () => {
-        chip.draggable = true;
+      el.querySelector('#a-open').onclick = () => { location.href = mailto; onOpened(); };
+
+      // Chrome/Edge/Firefox: this card carries the real file when dragged.
+      const chip = el.querySelector('#a-pdf');
+      if (chip) {
         const reader = new FileReader();
         let dataUrl = null;
         reader.onload = () => { dataUrl = reader.result; };
         reader.readAsDataURL(file);
-        chip.addEventListener('dragstart', (e) => {
-          try { e.dataTransfer.items.add(file); } catch { /* not supported */ }
-          try { if (dataUrl) e.dataTransfer.setData('DownloadURL', `application/pdf:${file.name}:${dataUrl}`); } catch { /* not supported */ }
-          e.dataTransfer.effectAllowed = 'copy';
+        chip.addEventListener('dragstart', (ev) => {
+          try { ev.dataTransfer.items.add(file); } catch { /* not supported */ }
+          try { if (dataUrl) ev.dataTransfer.setData('DownloadURL', `application/pdf:${file.name}:${dataUrl}`); } catch { /* not supported */ }
+          ev.dataTransfer.effectAllowed = 'copy';
         });
-      };
-      pdfImg.src = pdfUrl;
-      chip.addEventListener('click', () => downloadBlob(file, file.name));
+      }
 
-      // render page 1 as an image for drag / copy-paste
+      // page image for copy & paste
+      let imgBlob = null;
       const img = el.querySelector('#a-img');
       const lay = layout(db.template, { inv, settings: db.settings });
       preloadImages(lay).then((imgs) => {
@@ -258,17 +276,11 @@ function attachSheet(inv, file, mailto, onOpened) {
           el.querySelector('#a-copy').disabled = !(navigator.clipboard && window.ClipboardItem);
         }, 'image/png');
       });
-
-      el.querySelector('#a-save').onclick = () => downloadBlob(file, file.name);
       el.querySelector('#a-copy').onclick = () => {
         if (!imgBlob) return;
         navigator.clipboard.write([new ClipboardItem({ 'image/png': imgBlob })])
           .then(() => toast('Copied — paste it into the email'))
           .catch(() => toast('Copy failed — press and hold the image instead', 'bad'));
-      };
-      el.querySelector('#a-open').onclick = () => {
-        location.href = mailto;
-        onOpened();
       };
     },
   });

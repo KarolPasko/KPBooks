@@ -651,3 +651,16 @@ body.no-tabs #view.with-footer { padding-bottom: calc(var(--safe-b) + 110px); }
 .pdf-drag { width: 46px; aspect-ratio: 1 / 1.414; flex: none; border-radius: 4px; background: #fff; object-fit: contain; box-shadow: 0 2px 8px rgba(0, 0, 0, .18); -webkit-user-drag: element; -webkit-touch-callout: default; cursor: grab; }
 .pdf-chip.native { cursor: default; }
 .pdf-chip.native:active { transform: none; box-shadow: none; }
+
+/* two-step attach */
+.step { display: flex; gap: 14px; padding: 16px; margin: 10px 0; transition: opacity .25s; }
+.step.off { opacity: .45; pointer-events: none; }
+.step-num { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; color: #fff; background: var(--accent); }
+.step.done .step-num { background: #34c759; font-size: 0; }
+.step.done .step-num::after { content: "✓"; font-size: 16px; }
+.step-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.step-body > .btn { align-self: flex-start; margin-top: 4px; }
+.steps.tight { margin: 4px 0; font-size: 15px; line-height: 1.5; }
+.steps.tight li { margin-bottom: 4px; }
+.step .pdf-chip { margin-top: 6px; }
+.raw .page-thumb { margin-top: 4px; }
