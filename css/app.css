@@ -648,3 +648,6 @@ body.no-tabs #view.with-footer { padding-bottom: calc(var(--safe-b) + 110px); }
 .ck-buttons { display: flex; justify-content: center; margin-top: 10px; }
 .ck-buttons:empty, .ck-buttons > div:empty { display: none; }
 #sync-now { margin-top: 12px; }
+.pdf-drag { width: 46px; aspect-ratio: 1 / 1.414; flex: none; border-radius: 4px; background: #fff; object-fit: contain; box-shadow: 0 2px 8px rgba(0, 0, 0, .18); -webkit-user-drag: element; -webkit-touch-callout: default; cursor: grab; }
+.pdf-chip.native { cursor: default; }
+.pdf-chip.native:active { transform: none; box-shadow: none; }

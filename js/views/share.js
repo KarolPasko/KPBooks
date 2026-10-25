@@ -195,10 +195,11 @@ function attachSheet(inv, file, mailto, onOpened) {
     body: `
       <p class="hint">Drag the invoice into your email, or save it and attach it from Mail. Mail opens with the address, subject and message already filled in.</p>
       <div class="attach-drop">
-        <a class="pdf-chip" id="a-pdf" href="${pdfUrl}" download="${esc(file.name)}" draggable="true">
-          <span class="pdf-ic">PDF</span>
-          <span class="pdf-meta"><b>${esc(file.name)}</b><span class="muted small">${Math.max(1, Math.round(file.size / 1024))} KB · drag me into the email</span></span>
-        </a>
+        <div class="pdf-chip" id="a-pdf">
+          <span class="pdf-ic" id="a-badge">PDF</span>
+          <img class="pdf-drag" id="a-pdfimg" alt="${esc(file.name)}" hidden>
+          <span class="pdf-meta"><b>${esc(file.name)}</b><span class="muted small" id="a-hint">${Math.max(1, Math.round(file.size / 1024))} KB · drag me into the email</span></span>
+        </div>
         <div class="page-thumb"><img id="a-img" alt="Invoice ${esc(inv.number)}" draggable="true"><span class="muted small">Page image — drag, or copy &amp; paste</span></div>
       </div>
       <div class="btn-col">
@@ -218,20 +219,32 @@ function attachSheet(inv, file, mailto, onOpened) {
       <p class="hint">On a computer you can drag the PDF card straight into an email or onto your desktop.</p>`,
     onMount(el) {
       const chip = el.querySelector('#a-pdf');
-      // Desktop Chrome/Edge: dropping outside the browser creates the real PDF file.
-      const reader = new FileReader();
-      let dataUrl = null;
-      reader.onload = () => { dataUrl = reader.result; };
-      reader.readAsDataURL(file);
-      chip.addEventListener('dragstart', (e) => {
-        try {
-          if (dataUrl) e.dataTransfer.setData('DownloadURL', `application/pdf:${file.name}:${dataUrl}`);
-          e.dataTransfer.items.add(file); // some browsers accept real files
-        } catch { /* not supported everywhere */ }
-        e.dataTransfer.setData('text/uri-list', pdfUrl);
-        e.dataTransfer.effectAllowed = 'copy';
-      });
-      chip.addEventListener('click', (e) => { e.preventDefault(); downloadBlob(file, file.name); });
+      const pdfImg = el.querySelector('#a-pdfimg');
+      // Safari (iPhone, iPad, Mac) can show a PDF in an <img>. Dragging that
+      // image hands over the actual PDF file, not a link — so when it loads,
+      // the PDF thumbnail itself becomes the thing you drag.
+      pdfImg.onload = () => {
+        pdfImg.hidden = false;
+        pdfImg.draggable = true;
+        el.querySelector('#a-badge').hidden = true;
+        el.querySelector('#a-hint').textContent = 'Press and hold the page, then drag it into the email';
+        chip.classList.add('native');
+      };
+      // Other browsers (Chrome, Edge…): attach the real file to the drag ourselves.
+      pdfImg.onerror = () => {
+        chip.draggable = true;
+        const reader = new FileReader();
+        let dataUrl = null;
+        reader.onload = () => { dataUrl = reader.result; };
+        reader.readAsDataURL(file);
+        chip.addEventListener('dragstart', (e) => {
+          try { e.dataTransfer.items.add(file); } catch { /* not supported */ }
+          try { if (dataUrl) e.dataTransfer.setData('DownloadURL', `application/pdf:${file.name}:${dataUrl}`); } catch { /* not supported */ }
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+      };
+      pdfImg.src = pdfUrl;
+      chip.addEventListener('click', () => downloadBlob(file, file.name));
 
       // render page 1 as an image for drag / copy-paste
       const img = el.querySelector('#a-img');
