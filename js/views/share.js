@@ -188,6 +188,15 @@ export function sendSheet(inv, onDone) {
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const isMacSafari = () => /Macintosh/.test(navigator.userAgent) && !isIOS() && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent);
 
+// Where each desktop browser lists downloads you can drag from.
+function browserDownloads() {
+  const ua = navigator.userAgent;
+  if (/Edg\//.test(ua)) return 'Click the <b>Downloads</b> button (⬇︎) in Edge\'s toolbar, top right.';
+  if (/Firefox\//.test(ua)) return 'Click the <b>Downloads</b> arrow (⬇︎) in Firefox\'s toolbar, top right.';
+  if (/Chrome\//.test(ua)) return 'Click the <b>Downloads</b> icon (⬇︎) in Chrome\'s toolbar, top right — the download bubble.';
+  return 'Open your browser\'s <b>Downloads</b> list.';
+}
+
 function attachSheet(inv, file, mailto, onOpened) {
   const ios = isIOS();
   const macSafari = isMacSafari();
@@ -205,8 +214,10 @@ function attachSheet(inv, file, mailto, onOpened) {
         <li>Drag <b>${name}</b> from that list straight into the email. It goes in as a PDF attachment.</li>
       </ol>`
       : `<ol class="steps tight">
-        <li>Click <b>Open Mail</b>.</li>
-        <li>Drag <b>${name}</b> from your browser's downloads bar or Downloads folder into the email — or drag the card below.</li>
+        <li>Click <b>Open Mail</b> — a new email opens with everything filled in.</li>
+        <li>${browserDownloads()}</li>
+        <li>Drag <b>${name}</b> from that list straight into the email. It goes in as a PDF attachment.</li>
+        <li>No luck? Open your <b>Downloads</b> folder (Finder or File Explorer) and drag it from there.</li>
       </ol>`;
   sheet({
     title: 'Add the PDF to your email',
@@ -229,7 +240,6 @@ function attachSheet(inv, file, mailto, onOpened) {
             <button class="btn sm primary" id="a-open">${icon('mail')} Open Mail</button>
             ${ios ? `<a class="btn sm" href="shareddocuments://" id="a-files">${icon('file')} Open Files</a>` : ''}
           </div>
-          ${!ios && !macSafari ? `<div class="pdf-chip" id="a-pdf" draggable="true"><span class="pdf-ic">PDF</span><span class="pdf-meta"><b>${name}</b><span class="muted small">or drag this card into the email</span></span></div>` : ''}
         </div>
       </div>
       <details class="raw">
@@ -248,20 +258,6 @@ function attachSheet(inv, file, mailto, onOpened) {
         st2.classList.remove('off');
       };
       el.querySelector('#a-open').onclick = () => { location.href = mailto; onOpened(); };
-
-      // Chrome/Edge/Firefox: this card carries the real file when dragged.
-      const chip = el.querySelector('#a-pdf');
-      if (chip) {
-        const reader = new FileReader();
-        let dataUrl = null;
-        reader.onload = () => { dataUrl = reader.result; };
-        reader.readAsDataURL(file);
-        chip.addEventListener('dragstart', (ev) => {
-          try { ev.dataTransfer.items.add(file); } catch { /* not supported */ }
-          try { if (dataUrl) ev.dataTransfer.setData('DownloadURL', `application/pdf:${file.name}:${dataUrl}`); } catch { /* not supported */ }
-          ev.dataTransfer.effectAllowed = 'copy';
-        });
-      }
 
       // page image for copy & paste
       let imgBlob = null;
