@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION when files change.
-const VERSION = 'tally-v3';
+const VERSION = 'tally-v4';
 const FILES = [
-  './', 'index.html', 'privacy.html', 'manifest.webmanifest', 'css/app.css',
+  './', 'index.html', 'privacy.html', 'terms.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/util.js', 'js/store.js', 'js/layout.js', 'js/pdf.js', 'js/importer.js', 'js/ui.js', 'js/gmail.js',
   'js/views/home.js', 'js/views/invoices.js', 'js/views/invoice-view.js', 'js/views/editor.js', 'js/views/designer.js',
   'js/views/clients.js', 'js/views/items.js', 'js/views/import.js', 'js/views/settings.js', 'js/views/share.js',
