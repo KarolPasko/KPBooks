@@ -41,29 +41,72 @@ const P = {
 export const icon = (name, cls = '') =>
   `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
 
-// ---- header ----
-export function header({ title, back, right = '', large = true, sub = '' }) {
+// ---- navigation bar (iOS style: large title that collapses into the bar on scroll) ----
+const BACK_LABELS = { '#/': 'Home', '#/invoices': 'Invoices', '#/clients': 'Clients', '#/more': 'More', '#/settings': 'Settings' };
+let pendingLarge = null;
+
+export function header({ title, back, backLabel, right = '', large = true, sub = '' }) {
   const hd = $('#topbar');
-  hd.className = 'topbar' + (large ? ' large' : '');
+  hd.className = 'topbar' + (large ? ' large' : ' solid');
+  const label = backLabel || BACK_LABELS[back] || (/^#\/invoice\//.test(back || '') ? 'Invoice' : 'Back');
   hd.innerHTML = `
     <div class="tb-row">
-      <div class="tb-left">${back ? `<button class="tb-btn" data-back="${esc(back)}">${icon('back')}<span>Back</span></button>` : ''}</div>
-      <div class="tb-mid">${large ? '' : esc(title)}</div>
+      <div class="tb-left">${back ? `<button class="tb-btn tb-back" data-back="${esc(back)}">${icon('back')}<span>${esc(label)}</span></button>` : ''}</div>
+      <div class="tb-mid">${esc(title)}</div>
       <div class="tb-right">${right}</div>
-    </div>
-    ${large ? `<h1 class="tb-large">${esc(title)}</h1>${sub ? `<p class="tb-sub">${esc(sub)}</p>` : ''}` : ''}`;
+    </div>`;
+  pendingLarge = large ? { title, sub } : null;
   const b = hd.querySelector('[data-back]');
   if (b) b.onclick = () => (history.length > 1 && b.dataset.back === 'history' ? history.back() : (location.hash = b.dataset.back));
 }
 
-// ---- toast ----
+// Called by the router once a screen has rendered.
+export function mountLargeTitle(main) {
+  const hd = $('#topbar');
+  main.onscroll = null;
+  if (pendingLarge) {
+    const lt = document.createElement('div');
+    lt.className = 'large-title';
+    lt.innerHTML = `<h1>${esc(pendingLarge.title)}</h1>${pendingLarge.sub ? `<p>${esc(pendingLarge.sub)}</p>` : ''}`;
+    main.prepend(lt);
+    const h1 = lt.querySelector('h1');
+    main.onscroll = () => {
+      const y = main.scrollTop;
+      hd.classList.toggle('collapsed', y > h1.offsetTop + h1.offsetHeight - 6);
+      hd.classList.toggle('edge', y > 2);
+      // rubber-band: the big title grows a little when pulled down, like iOS
+      h1.style.transform = y < 0 ? `scale(${Math.min(1.12, 1 - y / 900)})` : '';
+    };
+  } else {
+    main.onscroll = () => hd.classList.toggle('edge', main.scrollTop > 2);
+  }
+  main.onscroll();
+}
+
+// ---- toast: a Dynamic-Island style pill at the top of the screen ----
 let toastT;
 export function toast(msg, kind = '') {
   const t = $('#toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + kind;
+  t.innerHTML = `<span class="toast-ic">${icon(kind === 'bad' ? 'x' : 'check')}</span><span class="toast-msg">${esc(msg)}</span>`;
+  t.className = 'toast ' + kind;
+  void t.offsetWidth;
+  t.classList.add('show');
   clearTimeout(toastT);
-  toastT = setTimeout(() => (t.className = 'toast'), 2600);
+  toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// Coloured avatar per name, like Contacts.
+export function avatarStyle(name) {
+  let h = 0;
+  for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `background:linear-gradient(160deg,hsl(${h} 75% 62%),hsl(${(h + 25) % 360} 70% 46%))`;
+}
+
+// Keep the app "card" scaled back while any sheet is open (iOS sheet look).
+let openSheets = 0;
+function sheetCount(d) {
+  openSheets = Math.max(0, openSheets + d);
+  document.body.classList.toggle('sheet-open', openSheets > 0);
 }
 
 // ---- bottom sheets ----
@@ -80,12 +123,14 @@ export function sheet({ title = '', body = '', onMount, onClose, tall = false, f
       ${footer ? `<div class="sheet-foot">${footer}</div>` : ''}
     </div>`;
   host.appendChild(wrap);
+  sheetCount(1);
   requestAnimationFrame(() => wrap.classList.add('open'));
   let closed = false;
   const close = () => {
     if (closed) return;
     closed = true;
     if (onClose) onClose();
+    sheetCount(-1);
     wrap.classList.remove('open');
     setTimeout(() => wrap.remove(), 260);
   };
@@ -113,36 +158,116 @@ export function sheet({ title = '', body = '', onMount, onClose, tall = false, f
   return close;
 }
 
+// iOS-style centred alert.
 export function confirmSheet(message, { ok = 'OK', danger = false, title = 'Are you sure?' } = {}) {
   return new Promise((resolve) => {
-    let answered = false;
-    sheet({
-      title,
-      body: `<p class="confirm-msg">${esc(message)}</p>
-        <div class="btn-col">
-          <button class="btn ${danger ? 'danger' : 'primary'} block" data-ok>${esc(ok)}</button>
-          <button class="btn ghost block" data-cancel>Cancel</button>
-        </div>`,
-      onClose: () => { if (!answered) resolve(false); },
-      onMount(el, closeFn) {
-        el.querySelector('[data-ok]').onclick = () => { answered = true; resolve(true); closeFn(); };
-        el.querySelector('[data-cancel]').onclick = () => { answered = true; resolve(false); closeFn(); };
-      },
-    });
+    const wrap = document.createElement('div');
+    wrap.className = 'alert-wrap';
+    wrap.innerHTML = `
+      <div class="alert" role="alertdialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="alert-text"><h3>${esc(title)}</h3><p>${esc(message)}</p></div>
+        <div class="alert-btns"><button data-v="0">Cancel</button><button data-v="1" class="${danger ? 'danger' : 'strong'}">${esc(ok)}</button></div>
+      </div>`;
+    $('#sheets').appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add('open'));
+    wrap.onclick = (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      wrap.classList.remove('open');
+      setTimeout(() => wrap.remove(), 200);
+      resolve(b.dataset.v === '1');
+    };
   });
 }
 
+// iOS-style action sheet with a separate Cancel button.
 export function actionSheet(title, actions) {
   return new Promise((resolve) => {
-    let picked = false;
-    sheet({
-      title,
-      onClose: () => { if (!picked) resolve(null); },
-      body: `<div class="action-list">${actions.map((a, i) => `<button class="action-row ${a.danger ? 'danger' : ''}" data-i="${i}">${a.icon ? icon(a.icon) : ''}<span>${esc(a.label)}</span></button>`).join('')}</div>`,
-      onMount(el, close) {
-        el.querySelectorAll('[data-i]').forEach((b) => (b.onclick = () => { picked = true; close(); resolve(actions[+b.dataset.i].value ?? +b.dataset.i); }));
-      },
+    const wrap = document.createElement('div');
+    wrap.className = 'as-wrap';
+    wrap.innerHTML = `
+      <div class="sheet-scrim"></div>
+      <div class="as">
+        <div class="as-group">
+          ${title ? `<div class="as-title">${esc(title)}</div>` : ''}
+          ${actions.map((a, i) => `<button class="as-btn ${a.danger ? 'danger' : ''}" data-i="${i}">${a.icon ? icon(a.icon) : ''}<span>${esc(a.label)}</span></button>`).join('')}
+        </div>
+        <button class="as-btn as-cancel" data-i="-1">Cancel</button>
+      </div>`;
+    $('#sheets').appendChild(wrap);
+    sheetCount(1);
+    requestAnimationFrame(() => wrap.classList.add('open'));
+    const done = (v) => {
+      sheetCount(-1);
+      wrap.classList.remove('open');
+      setTimeout(() => wrap.remove(), 260);
+      resolve(v);
+    };
+    wrap.querySelector('.sheet-scrim').onclick = () => done(null);
+    wrap.querySelectorAll('[data-i]').forEach((b) => (b.onclick = () => {
+      const i = +b.dataset.i;
+      done(i < 0 ? null : actions[i].value ?? i);
+    }));
+  });
+}
+
+// iOS swipe-to-reveal actions on list rows.
+// actionsFor(row) -> [{ label, icon, cls: 'green'|'red'|'blue', run }]
+export function swipeRows(container, selector, actionsFor) {
+  let open = null;
+  const closeOpen = () => { if (open) { open.style.transform = ''; open.classList.remove('swiped'); open = null; } };
+  container.querySelectorAll(selector).forEach((row) => {
+    const acts = actionsFor(row);
+    if (!acts.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'swipe-wrap';
+    row.replaceWith(wrap);
+    const tray = document.createElement('div');
+    tray.className = 'swipe-actions';
+    tray.innerHTML = acts.map((a, i) => `<button class="swipe-btn ${a.cls || ''}" data-i="${i}">${a.icon ? icon(a.icon) : ''}<span>${esc(a.label)}</span></button>`).join('');
+    wrap.append(tray, row);
+    const W = acts.length * 78;
+    row.draggable = false;
+    row.addEventListener('dragstart', (e) => e.preventDefault());
+    let x0 = null, y0 = 0, dx = 0, mode = null, base = 0;
+    row.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      x0 = e.clientX; y0 = e.clientY; dx = 0; mode = null;
+      base = row.classList.contains('swiped') ? -W : 0;
+      if (open && open !== row) closeOpen();
     });
+    row.addEventListener('pointermove', (e) => {
+      if (x0 === null) return;
+      const mx = e.clientX - x0, my = e.clientY - y0;
+      if (!mode && (Math.abs(mx) > 8 || Math.abs(my) > 8)) {
+        mode = Math.abs(mx) > Math.abs(my) ? 'h' : 'v';
+        if (mode === 'h') { row.setPointerCapture(e.pointerId); row.classList.add('dragging'); }
+      }
+      if (mode !== 'h') return;
+      dx = Math.min(0, base + mx);
+      if (dx < -W) dx = -W + (dx + W) * 0.3; // resistance past the buttons
+      row.style.transform = `translateX(${dx}px)`;
+    });
+    const end = () => {
+      row.classList.remove('dragging');
+      if (mode === 'h') {
+        if (dx < -W * 0.4) { row.style.transform = `translateX(${-W}px)`; row.classList.add('swiped'); open = row; }
+        else { row.style.transform = ''; row.classList.remove('swiped'); if (open === row) open = null; }
+      }
+      x0 = null;
+    };
+    row.addEventListener('pointerup', end);
+    row.addEventListener('pointercancel', end);
+    // a swipe isn't a tap
+    row.addEventListener('click', (e) => {
+      if (mode === 'h' || row.classList.contains('swiped')) { e.preventDefault(); if (mode !== 'h') closeOpen(); mode = null; }
+    });
+    tray.onclick = (e) => {
+      const b = e.target.closest('[data-i]');
+      if (!b) return;
+      closeOpen();
+      acts[+b.dataset.i].run();
+    };
   });
 }
 

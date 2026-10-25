@@ -1,6 +1,6 @@
 import { db, getClient, newClient, upsertClient, deleteClient, clientName } from '../store.js';
 import { esc, money, totals, statusOf, initials } from '../util.js';
-import { header, icon, field, readForm, toast, confirmSheet, emptyState } from '../ui.js';
+import { header, icon, field, readForm, toast, confirmSheet, emptyState, avatarStyle } from '../ui.js';
 import { invoiceRow } from './invoices.js';
 
 export default function clients({ main }) {
@@ -18,7 +18,7 @@ export default function clients({ main }) {
         const invs = db.invoices.filter((i) => i.clientId === c.id);
         const owed = invs.filter((i) => ['sent', 'overdue'].includes(statusOf(i))).reduce((s, i) => s + totals(i).due, 0);
         return `<a class="row" href="#/client/${c.id}">
-          <span class="avatar ${c.type === 'personal' ? 'alt' : ''}">${esc(initials(c.name))}</span>
+          <span class="avatar" style="${avatarStyle(c.name)}">${esc(initials(c.name))}</span>
           <span class="row-main"><span class="row-title">${esc(clientName(c))}</span>
           <span class="row-sub">${esc(c.email || (c.type === 'personal' ? 'Personal' : 'Business'))} · ${invs.length} invoice${invs.length === 1 ? '' : 's'}</span></span>
           ${owed ? `<span class="row-end"><span class="row-amt">${esc(money(owed))}</span><span class="muted small">owed</span></span>` : `<span class="chev">${icon('chev')}</span>`}

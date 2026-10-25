@@ -1,6 +1,6 @@
 import { db, getInvoice, newInvoice, upsertInvoice, getClient, newClient, upsertClient, clientName, suggestItems, exactItem, priceStats, logEvent } from '../store.js';
 import { esc, money, fmtDate, totals, lineAmount, uid, addDays, num, initials, clientAddressLines } from '../util.js';
-import { header, icon, sheet, toast, confirmSheet, field, readForm } from '../ui.js';
+import { header, icon, sheet, toast, confirmSheet, field, readForm, avatarStyle } from '../ui.js';
 import { renderPreview } from './share.js';
 
 export default function editor({ params, query, main }) {
@@ -84,7 +84,7 @@ export default function editor({ params, query, main }) {
     const c = inv.client;
     main.querySelector('#client').innerHTML = c
       ? `<button class="card client-card" id="pick-client">
-          <span class="avatar">${esc(initials(c.name))}</span>
+          <span class="avatar" style="${avatarStyle(c.name)}">${esc(initials(c.name))}</span>
           <span class="row-main"><span class="row-title">${esc(clientName(c))}</span>
           <span class="row-sub">${esc([c.email, clientAddressLines(c)[0]].filter(Boolean).join(' · ') || 'No email yet')}</span></span>
           <span class="chev">${icon('chev')}</span></button>`
@@ -113,7 +113,7 @@ export default function editor({ params, query, main }) {
           const q = el.querySelector('#cq').value.toLowerCase();
           const cs = db.clients.filter((c) => !q || [c.name, c.contact, c.email].join(' ').toLowerCase().includes(q));
           el.querySelector('#clist').innerHTML = cs.length
-            ? cs.map((c) => `<button class="row" data-id="${c.id}"><span class="avatar sm">${esc(initials(c.name))}</span><span class="row-main"><span class="row-title">${esc(clientName(c))}</span><span class="row-sub">${esc(c.email || (c.type === 'personal' ? 'Personal' : 'Business'))}</span></span>${inv.clientId === c.id ? icon('check', 'ok') : ''}</button>`).join('')
+            ? cs.map((c) => `<button class="row" data-id="${c.id}"><span class="avatar sm" style="${avatarStyle(c.name)}">${esc(initials(c.name))}</span><span class="row-main"><span class="row-title">${esc(clientName(c))}</span><span class="row-sub">${esc(c.email || (c.type === 'personal' ? 'Personal' : 'Business'))}</span></span>${inv.clientId === c.id ? icon('check', 'ok') : ''}</button>`).join('')
             : '<div class="row muted">No clients yet</div>';
         };
         list();
@@ -196,6 +196,12 @@ export default function editor({ params, query, main }) {
     if (!list.length) { ac.hidden = true; return; }
     ac.innerHTML = list.map((s) => `<button type="button" data-id="${s.id}"><span>${esc(s.name)}${s.unit ? ` <i>/ ${esc(s.unit)}</i>` : ''}</span><b>${esc(money(s.price))}</b></button>`).join('');
     ac.hidden = false;
+    // keep the suggestions clear of the floating footer bar
+    requestAnimationFrame(() => {
+      const limit = main.querySelector('.footer-bar').getBoundingClientRect().top - 12;
+      const over = ac.getBoundingClientRect().bottom - limit;
+      if (over > 0) main.scrollBy({ top: over, behavior: 'smooth' });
+    });
   };
 
   itemsEl.addEventListener('input', (e) => {

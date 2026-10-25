@@ -1,13 +1,15 @@
-import { db, clientName } from '../store.js';
-import { esc, money, fmtDate, totals, statusOf, STATUS_LABEL } from '../util.js';
-import { header, icon, statusPill, emptyState } from '../ui.js';
+import { db, clientName, upsertInvoice, deleteInvoice, logEvent } from '../store.js';
+import { esc, money, fmtDate, totals, statusOf, STATUS_LABEL, initials, today } from '../util.js';
+import { header, icon, statusPill, emptyState, avatarStyle, swipeRows, confirmSheet, toast } from '../ui.js';
 
 export function invoiceRow(inv) {
   const st = statusOf(inv);
   const t = totals(inv);
-  return `<a class="row inv-row" href="#/invoice/${inv.id}">
+  const name = clientName(inv.client);
+  return `<a class="row inv-row" href="#/invoice/${inv.id}" data-id="${inv.id}">
+    <span class="avatar sm" style="${avatarStyle(name)}">${esc(initials(name))}</span>
     <div class="row-main">
-      <div class="row-title">${esc(clientName(inv.client))}</div>
+      <div class="row-title">${esc(name)}</div>
       <div class="row-sub">${esc(inv.number)} · ${esc(fmtDate(inv.issueDate))}${inv.imported ? ' · imported' : ''}</div>
     </div>
     <div class="row-end">
@@ -41,12 +43,24 @@ export default function invoices({ main, query }) {
       .sort((a, b) => (b.issueDate || '').localeCompare(a.issueDate || '') || b.createdAt - a.createdAt);
     const sum = list.reduce((s, i) => s + (statusOf(i) === 'paid' ? totals(i).total : totals(i).due), 0);
     main.querySelector('#list').innerHTML = list.length
-      ? `<div class="list-meta">${list.length} invoice${list.length === 1 ? '' : 's'} · ${esc(money(sum))}</div><div class="card list">${list.map(invoiceRow).join('')}</div>`
+      ? `<div class="list-meta">${list.length} invoice${list.length === 1 ? '' : 's'} · ${esc(money(sum))} <span class="muted">· swipe a row for actions</span></div><div class="card list">${list.map(invoiceRow).join('')}</div>`
       : db.invoices.length
         ? emptyState('search', 'Nothing here', 'No invoices match this filter.')
         : emptyState('doc', 'No invoices yet', 'Create your first invoice, or import invoices you sent in the past.',
           `<div class="btn-row center"><a class="btn primary" href="#/new">${icon('plus')} New invoice</a><a class="btn" href="#/import">${icon('upload')} Import</a></div>`);
+    addSwipes();
   };
+  // swipe left on a row for quick actions
+  const addSwipes = () => swipeRows(main.querySelector('#list'), '.inv-row', (row) => {
+    const inv = db.invoices.find((i) => i.id === row.dataset.id);
+    if (!inv) return [];
+    return [
+      inv.status === 'paid'
+        ? { label: 'Unpaid', icon: 'undo', cls: 'orange', run: () => { inv.status = 'sent'; inv.paidDate = null; logEvent(inv, 'Marked unpaid'); upsertInvoice(inv); draw(); } }
+        : { label: 'Paid', icon: 'check', cls: 'green', run: () => { inv.status = 'paid'; inv.paidDate = today(); logEvent(inv, 'Marked paid'); upsertInvoice(inv); toast(`${inv.number} marked as paid`); draw(); } },
+      { label: 'Delete', icon: 'trash', cls: 'red', run: async () => { if (await confirmSheet(`Delete ${inv.number}? This can’t be undone.`, { ok: 'Delete', danger: true, title: 'Delete invoice?' })) { deleteInvoice(inv.id); draw(); } } },
+    ];
+  });
   main.querySelector('#chips').onclick = (e) => { const b = e.target.closest('[data-f]'); if (b) { filter = b.dataset.f; draw(); } };
   main.querySelector('#q').oninput = (e) => { q = e.target.value; draw(); };
   draw();

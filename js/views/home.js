@@ -22,38 +22,55 @@ export default function home({ main }) {
 
   main.innerHTML = `
   <div class="pad">
-    <section class="hero card">
+    <section class="hero">
+      <div class="hero-glow" aria-hidden="true"></div>
       <div class="hero-label">Outstanding</div>
-      <div class="hero-num">${esc(money(outstanding))}</div>
-      <div class="hero-sub">${unpaidN} unpaid invoice${unpaidN === 1 ? '' : 's'}</div>
-      <a class="btn primary block hero-btn" href="#/new">${icon('plus')} New invoice</a>
+      <div class="hero-num" id="hero-num" data-to="${outstanding}">${esc(money(outstanding))}</div>
+      <div class="hero-sub">${unpaidN} unpaid invoice${unpaidN === 1 ? '' : 's'}${overdueN ? ` · <b>${overdueN} overdue</b>` : ''}</div>
+      <a class="btn hero-btn block" href="#/new">${icon('plus')} New invoice</a>
     </section>
     <section class="tiles">
       <a class="tile card" href="#/invoices?f=overdue">
-        <div class="tile-label">${overdueN ? '<span class="dot bad"></span>' : ''}Overdue</div>
+        <span class="tile-ic red">${icon('arrowDown')}</span>
+        <div class="tile-label">Overdue</div>
         <div class="tile-num">${esc(money(overdue))}</div>
         <div class="tile-sub">${overdueN} invoice${overdueN === 1 ? '' : 's'}</div>
       </a>
       <a class="tile card" href="#/invoices?f=paid">
+        <span class="tile-ic green">${icon('check')}</span>
         <div class="tile-label">Paid · 30 days</div>
         <div class="tile-num">${esc(money(paid30))}</div>
         <div class="tile-sub">received</div>
       </a>
       <a class="tile card" href="#/invoices?f=draft">
+        <span class="tile-ic grey">${icon('edit')}</span>
         <div class="tile-label">Drafts</div>
         <div class="tile-num">${drafts}</div>
         <div class="tile-sub">not sent yet</div>
       </a>
     </section>
     <section class="quick">
-      <a class="quick-btn card" href="#/import">${icon('upload')}<span>Import past invoices</span></a>
-      <a class="quick-btn card" href="#/design">${icon('layout')}<span>Design invoice layout</span></a>
-      <a class="quick-btn card" href="#/items">${icon('tag')}<span>Price book</span></a>
-      <a class="quick-btn card" href="#/client/new">${icon('users')}<span>Add a client</span></a>
+      <a class="quick-btn card" href="#/import"><span class="qi teal">${icon('upload')}</span><span>Import past invoices</span></a>
+      <a class="quick-btn card" href="#/design"><span class="qi violet">${icon('layout')}</span><span>Design invoice layout</span></a>
+      <a class="quick-btn card" href="#/items"><span class="qi orange">${icon('tag')}</span><span>Price book</span></a>
+      <a class="quick-btn card" href="#/client/new"><span class="qi blue">${icon('users')}</span><span>Add a client</span></a>
     </section>
     <div class="section-head"><h2>Recent</h2>${recent.length ? '<a href="#/invoices">See all</a>' : ''}</div>
     ${recent.length ? `<div class="card list">${recent.map(invoiceRow).join('')}</div>`
       : `<div class="card note">No invoices yet. Tap <b>New invoice</b> to create one, or <a href="#/import">import past invoices</a> so prices fill in automatically.</div>`}
     <p class="privacy">${icon('check')} Your data never leaves this device. <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
   </div>`;
+
+  // count the big number up, like Wallet/Stocks
+  const el = main.querySelector('#hero-num');
+  const to = Number(el.dataset.to) || 0;
+  if (to > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const t0 = performance.now(), dur = 900;
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur);
+      el.textContent = money(to * (1 - Math.pow(1 - k, 3)));
+      if (k < 1 && el.isConnected) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
 }

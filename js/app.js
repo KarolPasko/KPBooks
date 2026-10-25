@@ -1,4 +1,4 @@
-import { $, toast } from './ui.js';
+import { $, toast, mountLargeTitle } from './ui.js';
 import { db } from './store.js';
 import home from './views/home.js';
 import invoices from './views/invoices.js';
@@ -26,6 +26,26 @@ const routes = [
 ];
 
 let current = null; // { cleanup, canLeave }
+let lastDepth = null;
+let lastTab = null;
+
+// How "deep" a screen is, so we can slide forward/back like iOS navigation.
+function depthOf(path) {
+  if (/^\/invoice\/[\w-]+\/edit$/.test(path)) return 2;
+  if (/^\/?$|^\/(invoices|clients|more)$/.test(path)) return 0;
+  return 1;
+}
+
+function moveTabIndicator() {
+  const active = document.querySelector('#tabbar [data-tab].active');
+  const ind = document.querySelector('#tabbar .tab-indicator');
+  if (!ind) return;
+  if (!active) { ind.style.opacity = '0'; return; }
+  ind.style.opacity = '1';
+  ind.style.width = active.offsetWidth + 'px';
+  ind.style.transform = `translateX(${active.offsetLeft}px)`;
+}
+window.addEventListener('resize', moveTabIndicator);
 let lastHash = location.hash;
 let ignoreNext = false;
 
@@ -47,12 +67,27 @@ async function route() {
     if (!m) continue;
     document.body.classList.toggle('no-tabs', !tab);
     for (const a of document.querySelectorAll('#tabbar [data-tab]')) a.classList.toggle('active', a.dataset.tab === tab);
+    moveTabIndicator();
+    const depth = depthOf(path || '/');
+    const anim = lastDepth === null ? '' : depth > lastDepth ? 'push' : depth < lastDepth ? 'pop' : tab !== lastTab ? 'fade' : '';
+    lastDepth = depth;
+    lastTab = tab;
     const main = $('#view');
     main.innerHTML = '';
     main.scrollTop = 0;
     main.className = '';
     try {
       current = (await view({ params: m.slice(1), query, main })) || null;
+      mountLargeTitle(main);
+      if (anim) {
+        for (const el of [main, $('#topbar')]) {
+          el.classList.remove('anim-push', 'anim-pop', 'anim-fade');
+          void el.offsetWidth;
+          el.classList.add('anim-' + anim);
+          // drop the class afterwards so no transform lingers (it would break position: fixed children)
+          el.addEventListener('animationend', (e) => { if (e.target === el) el.classList.remove('anim-' + anim); }, { once: true });
+        }
+      }
     } catch (e) {
       console.error(e);
       main.innerHTML = `<div class="pad"><p class="muted">Something went wrong: ${String(e.message || e)}</p></div>`;
