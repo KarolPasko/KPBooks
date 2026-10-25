@@ -15,6 +15,8 @@ const defaultSettings = () => ({
   numberDigits: 4,
   nextNumber: 1,
   gmailClientId: '',
+  shortcutEnabled: false,
+  shortcutName: 'Tally Send',
   dueDays: 14,
   taxRate: 0,
   notes: 'Thank you for your business!',

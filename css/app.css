@@ -433,3 +433,5 @@ textarea { resize: none; line-height: 1.4; }
 .gmail-cta .ic { color: var(--accent); }
 .hint.center { text-align: center; margin: -2px 0 2px; }
 .copy-code { display: inline-block; margin-top: 4px; padding: 3px 8px; border-radius: 6px; background: var(--surface); font-size: 13.5px; word-break: break-all; }
+.toggle.big { margin-top: 14px; font-size: 15px; color: var(--ink); }
+.steps ul { padding-left: 18px; margin: 4px 0; }

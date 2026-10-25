@@ -1,4 +1,6 @@
-import { db, save, replaceAll, loadDemo, formatNumber } from '../store.js';
+import { db, save, replaceAll, loadDemo, formatNumber, newInvoice } from '../store.js';
+import { shortcutPayload, runShortcut } from '../shortcut.js';
+import { makePdf } from './share.js';
 import { gmailAccount, loadGis, getToken, disconnectGmail, sendWithGmail } from '../gmail.js';
 import { esc, today, downloadBlob, num } from '../util.js';
 import { header, icon, field, readForm, toast, confirmSheet, sheet } from '../ui.js';
@@ -132,7 +134,18 @@ export function settings({ params, main }) {
         ${field('Default terms', 'terms', s.terms, { textarea: true, rows: 2 })}
       </div>
 
-      <div class="group-label" id="gmail">Send from Gmail</div>
+      <div class="group-label" id="auto">Send automatically · iPhone Shortcut</div>
+      <div class="card form">
+        <p class="form-intro"><b>Recommended.</b> Invoices are emailed in one tap, PDF attached, from the account in your iPhone's Mail app (add your Gmail there). No Google Cloud setup. You make a small Shortcut once — about 3 minutes.</p>
+        <label class="toggle big"><input type="checkbox" name="shortcutEnabled" ${s.shortcutEnabled ? 'checked' : ''}><span></span> Use the Shortcut to send invoices</label>
+        ${field('Shortcut name', 'shortcutName', s.shortcutName || 'Tally Send', { hint: 'Must match the name in the Shortcuts app exactly.' })}
+        <div class="btn-row">
+          <button class="btn sm primary" id="sc-help">${icon('wand')} How to make the Shortcut</button>
+          <button class="btn sm" id="sc-test">Send test email</button>
+        </div>
+      </div>
+
+      <div class="group-label" id="gmail">Or: send from Gmail with Google sign-in</div>
       <div class="card form">
         <p class="form-intro">Send invoices from your own Gmail address in one tap, with the PDF attached. You sign in with Google on this phone — Tally only gets permission to <i>send</i> email, and nothing goes through any other server. <a href="privacy.html">Privacy policy</a> · <a href="terms.html">Terms</a></p>
         ${field('Google OAuth Client ID', 'gmailClientId', s.gmailClientId, { placeholder: '1234…apps.googleusercontent.com', extra: 'autocapitalize="off" autocorrect="off" spellcheck="false"' })}
@@ -174,6 +187,8 @@ export function settings({ params, main }) {
     s.prefix = f.prefix.trim();
     s.numberDigits = +f.numberDigits || 4;
     s.gmailClientId = f.gmailClientId.trim();
+    s.shortcutEnabled = !!f.shortcutEnabled;
+    s.shortcutName = f.shortcutName.trim() || 'Tally Send';
     s.nextNumber = Math.max(1, Math.floor(num(f.nextNumber)) || 1);
     s.dueDays = Math.max(0, Math.floor(num(f.dueDays)));
     s.taxRate = num(f.taxRate);
@@ -232,11 +247,58 @@ export function settings({ params, main }) {
   };
   main.querySelector('#g-off').onclick = () => { disconnectGmail(); gStatus(); toast('Gmail disconnected'); };
   main.querySelector('#g-help').onclick = gmailHelp;
+  // ---- Shortcut ----
+  main.querySelector('#sc-help').onclick = () => shortcutHelp(main.querySelector('[name=shortcutName]').value.trim() || 'Tally Send');
+  const scTest = main.querySelector('#sc-test');
+  let testPayload = null;
+  scTest.onclick = () => {
+    s.shortcutName = main.querySelector('[name=shortcutName]').value.trim() || 'Tally Send';
+    const to = main.querySelector('[name="business.email"]').value.trim();
+    if (!to) { toast('Add your email under “Your business” first — the test is sent there', 'bad'); return; }
+    if (testPayload) { runShortcut(testPayload); testPayload = null; scTest.textContent = 'Send test email'; return; }
+    scTest.disabled = true;
+    scTest.textContent = 'Preparing…';
+    const inv = newInvoice({ number: 'TEST', items: [{ id: 't', name: 'Test item', qty: 1, price: 1, unit: '', description: '' }] });
+    makePdf(inv)
+      .then((blob) => shortcutPayload({ to, subject: 'Tally test email', body: 'It works! Invoices sent from Tally will arrive like this, with the PDF attached.', file: new File([blob], 'Invoice TEST.pdf', { type: 'application/pdf' }) }))
+      .then((p) => { testPayload = p; scTest.disabled = false; scTest.textContent = 'Tap to run the test'; })
+      .catch((e) => { scTest.disabled = false; scTest.textContent = 'Send test email'; toast(e.message, 'bad'); });
+  };
+  if (params[0] === 'auto') requestAnimationFrame(() => main.querySelector('#auto').scrollIntoView({ block: 'start' }));
   if (params[0] === 'gmail') requestAnimationFrame(() => main.querySelector('#gmail').scrollIntoView({ block: 'start' }));
   if (welcome) {
     main.querySelector('#skip').onclick = () => { s.onboarded = true; save(); location.hash = '#/'; };
     main.querySelector('#demo').onclick = () => { s.onboarded = true; loadDemo(); location.hash = '#/'; };
   }
+}
+
+function shortcutHelp(name) {
+  const v = (k) => `<code class="copy-code">${k}</code>`;
+  sheet({
+    title: 'Make the “' + name + '” Shortcut',
+    tall: true,
+    body: `
+      <p><b>Before you start:</b> make sure your Gmail is in the iPhone Mail app (Settings → Apps → Mail → Mail Accounts → Add Account → Google).</p>
+      <ol class="steps">
+        <li>Open the <b>Shortcuts</b> app, tap <b>+</b>, and name the shortcut exactly <b>${esc(name)}</b> (tap the name at the top).</li>
+        <li>Add <b>Get Clipboard</b>.</li>
+        <li>Add <b>Get Dictionary from Input</b> (it uses the Clipboard automatically).</li>
+        <li>Add <b>Get Dictionary Value</b> → set it to <i>Get Value for</i> ${v('pdf')} <i>in</i> <b>Dictionary</b>.</li>
+        <li>Add <b>Base64 Encode</b>, tap <i>Encode</i> and change it to <b>Decode</b>.</li>
+        <li>Add <b>Get Dictionary Value</b> → key ${v('filename')}. Tap its input and choose <b>Select Variable → Dictionary</b>.</li>
+        <li>Add <b>Set Name</b> → set the name of <b>Base64 Decoded</b> to <b>Dictionary Value</b> (the filename). Tap each blue field and pick the variable.</li>
+        <li>Add three more <b>Get Dictionary Value</b> actions for ${v('to')}, ${v('subject')} and ${v('body')}, each reading from <b>Dictionary</b> like step 6.</li>
+        <li>Add <b>Send Email</b>:
+          <ul>
+            <li><b>Recipients</b>: the ${v('to')} value</li>
+            <li><b>Subject</b>: the ${v('subject')} value</li>
+            <li><b>Message</b>: the ${v('body')} value, then the <b>Renamed Item</b> (the PDF) — it becomes the attachment</li>
+            <li>Tap the arrow to show more: turn <b>Show Compose Sheet</b> <b>off</b>, and set <b>From</b> to your Gmail address</li>
+          </ul></li>
+        <li>Tap <b>Done</b>. Back in Tally, turn the switch on, tap <b>Save</b>, then <b>Send test email</b>. The first time, iPhone asks whether the shortcut may send email — choose <b>Always Allow</b>.</li>
+      </ol>
+      <p class="hint">After sending, iPhone shows the Shortcuts app — swipe back or tap Tally to return. Sent emails appear in your Gmail “Sent” folder.</p>`,
+  });
 }
 
 function gmailHelp() {

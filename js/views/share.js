@@ -1,5 +1,6 @@
 // Previewing, exporting and emailing invoices.
 import { db, upsertInvoice, logEvent, clientName, getClient, upsertClient } from '../store.js';
+import { shortcutEnabled, shortcutName, shortcutPayload, runShortcut } from '../shortcut.js';
 import { gmailConfigured, gmailAccount, loadGis, getToken, sendWithGmail, validEmails } from '../gmail.js';
 import { esc, money, fmtDate, totals, fill, downloadBlob } from '../util.js';
 import { layout, drawPage, preloadImages } from '../layout.js';
@@ -46,6 +47,7 @@ export function sendSheet(inv, onDone) {
   let file = null;
   const canShareFiles = !!(navigator.canShare && window.File);
   const gmail = gmailConfigured();
+  const auto = shortcutEnabled();
   if (gmail) loadGis().catch(() => {});
   sheet({
     title: 'Send invoice',
@@ -59,13 +61,15 @@ export function sendSheet(inv, onDone) {
       <label class="field"><span class="field-label">Subject</span><input id="s-subj" value="${esc(fill(db.settings.emailSubject, vars))}"></label>
       <label class="field"><span class="field-label">Message</span><textarea id="s-body" rows="6">${esc(fill(db.settings.emailBody, vars))}</textarea></label>
       <div class="btn-col">
-        ${gmail ? `<button class="btn primary block" id="s-gmail" disabled>${icon('send')} <span>Preparing PDF…</span></button>
+        ${auto ? `<button class="btn primary block" id="s-auto" disabled>${icon('send')} <span>Preparing PDF…</span></button>
+        <p class="hint center">Sends via your “${esc(shortcutName())}” Shortcut and the Mail app, PDF attached.</p>` : ''}
+        ${gmail ? `<button class="btn ${auto ? '' : 'primary'} block" id="s-gmail" disabled>${icon('send')} <span>Preparing PDF…</span></button>
         <p class="hint center" id="s-gmail-note">Sends from ${esc(gmailAccount() || 'your Gmail')} with the PDF attached.</p>` : ''}
-        <button class="btn ${gmail ? '' : 'primary'} block" id="s-share" disabled>${icon('share')} <span>Preparing PDF…</span></button>
+        <button class="btn ${gmail || auto ? '' : 'primary'} block" id="s-share" disabled>${icon('share')} <span>Preparing PDF…</span></button>
         <button class="btn block" id="s-mail">${icon('mail')} Open in Mail (no attachment)</button>
         <button class="btn ghost block" id="s-dl">${icon('download')} Save PDF</button>
       </div>
-      ${gmail ? '' : `<a class="card note gmail-cta" href="#/settings/gmail">${icon('mail')}<span><b>Send automatically from Gmail</b><br><span class="muted small">One tap, PDF attached, no copy-pasting. Set it up once →</span></span></a>`}
+      ${gmail || auto ? '' : `<a class="card note gmail-cta" href="#/settings/auto">${icon('mail')}<span><b>Send automatically</b><br><span class="muted small">One tap, PDF attached, from your Gmail — no copy-pasting. Set it up once →</span></span></a>`}
       <p class="hint">${canShareFiles
         ? '<b>Share PDF</b> opens the iPhone share sheet — pick <b>Mail</b> and the PDF is attached. The email address is copied, so just paste it into “To”.'
         : 'Your browser can’t attach files directly. Save the PDF, then attach it to an email.'}</p>
@@ -73,12 +77,31 @@ export function sendSheet(inv, onDone) {
     onMount(el, close) {
       const btn = el.querySelector('#s-share');
       const gbtn = el.querySelector('#s-gmail');
+      const abtn = el.querySelector('#s-auto');
+      let payloadFor = null; // the fields the prepared payload was built from
+      let payload = null;
+      const preparePayload = () => {
+        const cur = JSON.stringify(v());
+        if (!file || payloadFor === cur) return;
+        payloadFor = cur;
+        payload = null;
+        if (abtn) abtn.disabled = true;
+        const { to, subject, body } = v();
+        shortcutPayload({ to, subject, body, file }).then((p) => {
+          if (payloadFor !== cur) return;
+          payload = p;
+          if (abtn) { abtn.disabled = false; abtn.querySelector('span').textContent = 'Send automatically'; }
+        });
+      };
+      // keep the payload ready so the tap itself does no waiting
+      el.addEventListener('input', () => { if (abtn) setTimeout(preparePayload, 0); });
       makePdf(inv).then((blob) => {
         file = new File([blob], pdfFileName(inv), { type: 'application/pdf' });
         const ok = canShareFiles && navigator.canShare({ files: [file] });
         btn.disabled = false;
         btn.querySelector('span').textContent = ok ? 'Share PDF via Mail…' : 'Save PDF';
         btn.dataset.mode = ok ? 'share' : 'download';
+        if (abtn) preparePayload();
         if (gbtn) {
           gbtn.querySelector('span').textContent = 'Send with Gmail';
           // Google sign-in must be loaded before the tap so its window can open.
@@ -110,6 +133,16 @@ export function sendSheet(inv, onDone) {
           downloadBlob(file, file.name);
           markSent('PDF saved');
         }
+      };
+      if (abtn) abtn.onclick = () => {
+        const { to } = v();
+        if (!to || !validEmails(to)) { toast('Enter a valid email address', 'bad'); el.querySelector('#s-to').focus(); return; }
+        if (!payload) { preparePayload(); toast('One moment — preparing…'); return; }
+        runShortcut(payload).then(() => {
+          el.querySelector('#s-mark').checked = true;
+          markSent(`Emailed to ${to} via Shortcut`);
+          close();
+        });
       };
       const cta = el.querySelector('.gmail-cta');
       if (cta) cta.addEventListener('click', close);
