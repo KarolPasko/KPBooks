@@ -15,6 +15,7 @@ export default function more({ main }) {
       </div>
       <div class="card list">
         <a class="row" href="#/settings"><span class="row-ic grey">${icon('gear')}</span><span class="row-main"><span class="row-title">Business & invoice settings</span><span class="row-sub">${esc(db.settings.business.name || 'Add your details')}</span></span><span class="chev">${icon('chev')}</span></a>
+        <a class="row" href="privacy.html"><span class="row-ic grey">${icon('eye')}</span><span class="row-main"><span class="row-title">Privacy policy</span><span class="row-sub">What Tally does (and doesn’t do) with your data</span></span><span class="chev">${icon('chev')}</span></a>
         <button class="row" id="install"><span class="row-ic green">${icon('download')}</span><span class="row-main"><span class="row-title">Add to Home Screen</span><span class="row-sub">Use it like a normal iPhone app, offline</span></span><span class="chev">${icon('chev')}</span></button>
       </div>
       <div class="group-label">Your data</div>
@@ -132,7 +133,7 @@ export function settings({ params, main }) {
 
       <div class="group-label" id="gmail">Send from Gmail</div>
       <div class="card form">
-        <p class="form-intro">Send invoices from your own Gmail address in one tap, with the PDF attached. You sign in with Google on this phone — Tally only gets permission to <i>send</i> email, and nothing goes through any other server.</p>
+        <p class="form-intro">Send invoices from your own Gmail address in one tap, with the PDF attached. You sign in with Google on this phone — Tally only gets permission to <i>send</i> email, and nothing goes through any other server. <a href="privacy.html">Privacy policy</a></p>
         ${field('Google OAuth Client ID', 'gmailClientId', s.gmailClientId, { placeholder: '1234…apps.googleusercontent.com', extra: 'autocapitalize="off" autocorrect="off" spellcheck="false"' })}
         <div class="gmail-status" id="gmail-status"></div>
         <div class="btn-row">

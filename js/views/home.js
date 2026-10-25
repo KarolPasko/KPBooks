@@ -54,6 +54,6 @@ export default function home({ main }) {
     <div class="section-head"><h2>Recent</h2>${recent.length ? '<a href="#/invoices">See all</a>' : ''}</div>
     ${recent.length ? `<div class="card list">${recent.map(invoiceRow).join('')}</div>`
       : `<div class="card note">No invoices yet. Tap <b>New invoice</b> to create one, or <a href="#/import">import past invoices</a> so prices fill in automatically.</div>`}
-    <p class="privacy">${icon('check')} Your data never leaves this device.</p>
+    <p class="privacy">${icon('check')} Your data never leaves this device. <a href="privacy.html">Privacy policy</a></p>
   </div>`;
 }
