@@ -37,6 +37,8 @@ async function route() {
   }
   if (current && current.cleanup) current.cleanup();
   current = null;
+  // sheets belong to the screen that opened them
+  document.querySelectorAll('#sheets .sheet-wrap').forEach((w) => w.remove());
   lastHash = location.hash;
   const [path, qs] = location.hash.replace(/^#/, '').split('?');
   const query = Object.fromEntries(new URLSearchParams(qs || ''));

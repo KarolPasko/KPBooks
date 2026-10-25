@@ -422,3 +422,14 @@ textarea { resize: none; line-height: 1.4; }
   .tiles { gap: 14px; }
   .quick { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ---------- numbering & gmail ---------- */
+.grid3 { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr; gap: 0 12px; }
+.num-preview { margin-top: 10px; font-size: 14px; color: var(--muted); }
+.num-preview b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.form-intro { font-size: 14.5px; color: var(--ink-2); margin: 12px 0 0; }
+.gmail-status { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14.5px; }
+.gmail-cta { display: flex; gap: 12px; align-items: center; color: var(--ink); margin: 4px 0 0; }
+.gmail-cta .ic { color: var(--accent); }
+.hint.center { text-align: center; margin: -2px 0 2px; }
+.copy-code { display: inline-block; margin-top: 4px; padding: 3px 8px; border-radius: 6px; background: var(--surface); font-size: 13.5px; word-break: break-all; }

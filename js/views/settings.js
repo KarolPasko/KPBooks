@@ -1,4 +1,5 @@
-import { db, save, replaceAll, loadDemo } from '../store.js';
+import { db, save, replaceAll, loadDemo, formatNumber } from '../store.js';
+import { gmailAccount, loadGis, getToken, disconnectGmail, sendWithGmail } from '../gmail.js';
 import { esc, today, downloadBlob, num } from '../util.js';
 import { header, icon, field, readForm, toast, confirmSheet, sheet } from '../ui.js';
 
@@ -113,9 +114,13 @@ export function settings({ params, main }) {
 
       <div class="group-label">Invoice defaults</div>
       <div class="card form">
-        <div class="grid2">
-          ${field('Number prefix', 'prefix', s.prefix)}
+        <div class="grid3">
+          ${field('Prefix', 'prefix', s.prefix, { placeholder: 'ABC', extra: 'autocapitalize="characters"' })}
+          <label class="field"><span class="field-label">Digits</span><select name="numberDigits">${[3, 4, 5, 6].map((d) => `<option ${d === (+s.numberDigits || 4) ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
           ${field('Next number', 'nextNumber', s.nextNumber, { inputmode: 'numeric' })}
+        </div>
+        <div class="num-preview">Next invoice: <b id="num-preview"></b></div>
+        <div class="grid2">
           ${field('Payment due (days)', 'dueDays', s.dueDays, { inputmode: 'numeric' })}
           ${field('Default tax / VAT %', 'taxRate', s.taxRate, { inputmode: 'decimal' })}
           <label class="field"><span class="field-label">Currency</span><select name="currency">${CURRENCIES.map((c) => `<option ${c === s.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
@@ -123,6 +128,19 @@ export function settings({ params, main }) {
         </div>
         ${field('Default notes', 'notes', s.notes, { textarea: true, rows: 2 })}
         ${field('Default terms', 'terms', s.terms, { textarea: true, rows: 2 })}
+      </div>
+
+      <div class="group-label" id="gmail">Send from Gmail</div>
+      <div class="card form">
+        <p class="form-intro">Send invoices from your own Gmail address in one tap, with the PDF attached. You sign in with Google on this phone — Tally only gets permission to <i>send</i> email, and nothing goes through any other server.</p>
+        ${field('Google OAuth Client ID', 'gmailClientId', s.gmailClientId, { placeholder: '1234…apps.googleusercontent.com', extra: 'autocapitalize="off" autocorrect="off" spellcheck="false"' })}
+        <div class="gmail-status" id="gmail-status"></div>
+        <div class="btn-row">
+          <button class="btn sm primary" id="g-connect">${icon('mail')} Connect Gmail</button>
+          <button class="btn sm" id="g-test" hidden>Send test email</button>
+          <button class="btn sm ghost danger" id="g-off" hidden>Disconnect</button>
+          <button class="btn sm ghost" id="g-help">How to get a Client ID</button>
+        </div>
       </div>
 
       <div class="group-label">Email message</div>
@@ -150,7 +168,10 @@ export function settings({ params, main }) {
   const doSave = () => {
     const f = readForm(main.querySelector('#f'));
     Object.assign(s.business, f.business, { logo: logo.src, logoW: logo.w, logoH: logo.h });
-    for (const k of ['paymentDetails', 'prefix', 'currency', 'locale', 'notes', 'terms', 'emailSubject', 'emailBody']) s[k] = f[k];
+    for (const k of ['paymentDetails', 'currency', 'locale', 'notes', 'terms', 'emailSubject', 'emailBody']) s[k] = f[k];
+    s.prefix = f.prefix.trim();
+    s.numberDigits = +f.numberDigits || 4;
+    s.gmailClientId = f.gmailClientId.trim();
     s.nextNumber = Math.max(1, Math.floor(num(f.nextNumber)) || 1);
     s.dueDays = Math.max(0, Math.floor(num(f.dueDays)));
     s.taxRate = num(f.taxRate);
@@ -161,10 +182,82 @@ export function settings({ params, main }) {
   };
   document.getElementById('save').onclick = doSave;
   main.querySelector('#save2').onclick = doSave;
+
+  // ---- invoice number preview ----
+  const preview = () => {
+    const f = readForm(main.querySelector('#f'));
+    main.querySelector('#num-preview').textContent = formatNumber(f.nextNumber || 1, f.prefix.trim(), f.numberDigits);
+  };
+  for (const n of ['prefix', 'numberDigits', 'nextNumber']) main.querySelector(`[name=${n}]`).addEventListener('input', preview);
+  main.querySelector('[name=numberDigits]').addEventListener('change', preview);
+  preview();
+
+  // ---- Gmail ----
+  const idInput = main.querySelector('[name=gmailClientId]');
+  const gStatus = () => {
+    const acct = gmailAccount();
+    main.querySelector('#gmail-status').innerHTML = acct
+      ? `<span class="pill st-paid">Connected</span> ${esc(acct)}`
+      : `<span class="pill st-draft">Not connected</span>`;
+    main.querySelector('#g-connect').hidden = !!acct;
+    main.querySelector('#g-test').hidden = !acct;
+    main.querySelector('#g-off').hidden = !acct;
+  };
+  gStatus();
+  const preload = () => { if (idInput.value.trim()) loadGis().catch(() => {}); };
+  idInput.addEventListener('change', preload);
+  preload();
+  const ensureId = () => {
+    const id = idInput.value.trim();
+    if (!/\.apps\.googleusercontent\.com$/.test(id)) { toast('Paste your Client ID first (it ends in .apps.googleusercontent.com)', 'bad'); idInput.focus(); return false; }
+    if (s.gmailClientId !== id) { s.gmailClientId = id; s.gmailEmail = ''; save(); }
+    if (!(window.google && google.accounts && google.accounts.oauth2)) {
+      loadGis().then(() => toast('Ready — tap the button again')).catch((e) => toast(e.message, 'bad'));
+      return false;
+    }
+    return true;
+  };
+  main.querySelector('#g-connect').onclick = () => {
+    if (!ensureId()) return;
+    getToken().then(() => { gStatus(); toast('Gmail connected'); }).catch((e) => toast(e.message, 'bad'));
+  };
+  main.querySelector('#g-test').onclick = () => {
+    if (!ensureId()) return;
+    getToken()
+      .then((t) => sendWithGmail(t, { to: gmailAccount(), subject: 'Tally test email', body: 'It works! Invoices sent from Tally will come from this Gmail account.' }))
+      .then(() => toast(`Test email sent to ${gmailAccount()}`))
+      .catch((e) => toast(e.message, 'bad'));
+  };
+  main.querySelector('#g-off').onclick = () => { disconnectGmail(); gStatus(); toast('Gmail disconnected'); };
+  main.querySelector('#g-help').onclick = gmailHelp;
+  if (params[0] === 'gmail') requestAnimationFrame(() => main.querySelector('#gmail').scrollIntoView({ block: 'start' }));
   if (welcome) {
     main.querySelector('#skip').onclick = () => { s.onboarded = true; save(); location.hash = '#/'; };
     main.querySelector('#demo').onclick = () => { s.onboarded = true; loadDemo(); location.hash = '#/'; };
   }
+}
+
+function gmailHelp() {
+  const origin = location.origin;
+  sheet({
+    title: 'Set up Gmail sending',
+    tall: true,
+    body: `
+      <p>Google requires every app that sends Gmail to have its own <b>Client ID</b>. It's free and takes about 5 minutes, once. Do it on a computer if you can — it's easier.</p>
+      <ol class="steps">
+        <li>Open <b>console.cloud.google.com</b> and sign in with the Gmail account you'll send from. Create a project (any name, e.g. “Tally”).</li>
+        <li>Search for <b>Gmail API</b> in the top search bar and tap <b>Enable</b>.</li>
+        <li>Go to <b>Google Auth Platform</b> (also called “OAuth consent screen”) → <b>Get started</b>. App name: <i>Tally</i>, support email: yours, audience: <b>External</b>. Finish.</li>
+        <li>In <b>Audience</b>, under <b>Test users</b>, add your own Gmail address.</li>
+        <li>In <b>Clients</b> → <b>Create client</b> → type <b>Web application</b>. Under <b>Authorised JavaScript origins</b> add:<br><code class="copy-code">${esc(origin)}</code></li>
+        <li>Create, then copy the <b>Client ID</b> (ends in <i>.apps.googleusercontent.com</i>) and paste it into Tally → <b>Connect Gmail</b>.</li>
+      </ol>
+      <p class="hint">When you connect, Google may say <b>“Google hasn't verified this app”</b> — that's normal for your own private app. Tap <b>Continue</b>, then allow <b>“Send email on your behalf”</b>. Google signs you out of Tally after about an hour; the next time you send, just pick your account again.</p>
+      <button class="btn block" id="copy-origin">${icon('copy')} Copy ${esc(origin)}</button>`,
+    onMount(el) {
+      el.querySelector('#copy-origin').onclick = () => navigator.clipboard.writeText(origin).then(() => toast('Copied')).catch(() => toast(origin));
+    },
+  });
 }
 
 function shrinkImage(file, max) {

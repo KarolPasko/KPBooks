@@ -1,5 +1,6 @@
 // Previewing, exporting and emailing invoices.
-import { db, upsertInvoice, logEvent, clientName } from '../store.js';
+import { db, upsertInvoice, logEvent, clientName, getClient, upsertClient } from '../store.js';
+import { gmailConfigured, gmailAccount, loadGis, getToken, sendWithGmail, validEmails } from '../gmail.js';
 import { esc, money, fmtDate, totals, fill, downloadBlob } from '../util.js';
 import { layout, drawPage, preloadImages } from '../layout.js';
 import { buildPdf, pdfFileName } from '../pdf.js';
@@ -44,6 +45,8 @@ export function sendSheet(inv, onDone) {
   const to = (inv.client && inv.client.email) || '';
   let file = null;
   const canShareFiles = !!(navigator.canShare && window.File);
+  const gmail = gmailConfigured();
+  if (gmail) loadGis().catch(() => {});
   sheet({
     title: 'Send invoice',
     tall: true,
@@ -56,28 +59,41 @@ export function sendSheet(inv, onDone) {
       <label class="field"><span class="field-label">Subject</span><input id="s-subj" value="${esc(fill(db.settings.emailSubject, vars))}"></label>
       <label class="field"><span class="field-label">Message</span><textarea id="s-body" rows="6">${esc(fill(db.settings.emailBody, vars))}</textarea></label>
       <div class="btn-col">
-        <button class="btn primary block" id="s-share" disabled>${icon('share')} <span>Preparing PDF…</span></button>
+        ${gmail ? `<button class="btn primary block" id="s-gmail" disabled>${icon('send')} <span>Preparing PDF…</span></button>
+        <p class="hint center" id="s-gmail-note">Sends from ${esc(gmailAccount() || 'your Gmail')} with the PDF attached.</p>` : ''}
+        <button class="btn ${gmail ? '' : 'primary'} block" id="s-share" disabled>${icon('share')} <span>Preparing PDF…</span></button>
         <button class="btn block" id="s-mail">${icon('mail')} Open in Mail (no attachment)</button>
         <button class="btn ghost block" id="s-dl">${icon('download')} Save PDF</button>
       </div>
+      ${gmail ? '' : `<a class="card note gmail-cta" href="#/settings/gmail">${icon('mail')}<span><b>Send automatically from Gmail</b><br><span class="muted small">One tap, PDF attached, no copy-pasting. Set it up once →</span></span></a>`}
       <p class="hint">${canShareFiles
         ? '<b>Share PDF</b> opens the iPhone share sheet — pick <b>Mail</b> and the PDF is attached. The email address is copied, so just paste it into “To”.'
         : 'Your browser can’t attach files directly. Save the PDF, then attach it to an email.'}</p>
       <label class="check"><input type="checkbox" id="s-mark" ${inv.status === 'draft' ? 'checked' : ''}> Mark as sent</label>`,
     onMount(el, close) {
       const btn = el.querySelector('#s-share');
+      const gbtn = el.querySelector('#s-gmail');
       makePdf(inv).then((blob) => {
         file = new File([blob], pdfFileName(inv), { type: 'application/pdf' });
         const ok = canShareFiles && navigator.canShare({ files: [file] });
         btn.disabled = false;
         btn.querySelector('span').textContent = ok ? 'Share PDF via Mail…' : 'Save PDF';
         btn.dataset.mode = ok ? 'share' : 'download';
+        if (gbtn) {
+          gbtn.querySelector('span').textContent = 'Send with Gmail';
+          // Google sign-in must be loaded before the tap so its window can open.
+          loadGis().then(() => { gbtn.disabled = false; })
+            .catch((e) => { gbtn.querySelector('span').textContent = 'Gmail unavailable (offline?)'; el.querySelector('#s-gmail-note').textContent = e.message; });
+        }
       }).catch((e) => { btn.querySelector('span').textContent = 'PDF failed'; console.error(e); });
       const v = () => ({ to: el.querySelector('#s-to').value.trim(), subject: el.querySelector('#s-subj').value, body: el.querySelector('#s-body').value });
       const markSent = (how) => {
         if (el.querySelector('#s-mark').checked && inv.status === 'draft') inv.status = 'sent';
         logEvent(inv, how);
-        if (!inv.client || !inv.client.email) { /* keep */ }
+        // remember an email address typed here on the client's record
+        const to = v().to;
+        const c = inv.clientId ? getClient(inv.clientId) : null;
+        if (c && !c.email && to && validEmails(to) && !to.includes(',')) upsertClient({ ...c, email: to });
         upsertInvoice(inv);
         if (onDone) onDone();
       };
@@ -94,6 +110,32 @@ export function sendSheet(inv, onDone) {
           downloadBlob(file, file.name);
           markSent('PDF saved');
         }
+      };
+      const cta = el.querySelector('.gmail-cta');
+      if (cta) cta.addEventListener('click', close);
+      if (gbtn) gbtn.onclick = () => {
+        if (!file) return;
+        const { to, subject, body } = v();
+        if (!to || !validEmails(to)) { toast('Enter a valid email address', 'bad'); el.querySelector('#s-to').focus(); return; }
+        const label = gbtn.querySelector('span');
+        // getToken() opens Google's sign-in straight from this tap when needed.
+        getToken()
+          .then((token) => {
+            gbtn.disabled = true;
+            label.textContent = 'Sending…';
+            return sendWithGmail(token, { to, subject, body, file });
+          })
+          .then(() => {
+            el.querySelector('#s-mark').checked = true;
+            markSent(`Emailed to ${to} via Gmail`);
+            toast(`Sent to ${to}`);
+            close();
+          })
+          .catch((e) => {
+            gbtn.disabled = false;
+            label.textContent = 'Send with Gmail';
+            toast(e.message, 'bad');
+          });
       };
       el.querySelector('#s-mail').onclick = () => {
         const { to, subject, body } = v();

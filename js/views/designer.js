@@ -1,6 +1,6 @@
 // The invoice layout editor: drag blocks around a real page, restyle them,
 // and see exactly what the PDF will look like.
-import { db, save } from '../store.js';
+import { db, save, nextNumber } from '../store.js';
 import { esc, uid, today, addDays } from '../util.js';
 import { layout, drawPage, preloadImages, presetTemplate, newBlock, BLOCK_TYPES, PAGES, MARGIN, FONTS } from '../layout.js';
 import { header, icon, actionSheet, confirmSheet, toast } from '../ui.js';
@@ -14,7 +14,7 @@ function sampleInvoice() {
     address: '1 High Street', city: 'London', postcode: 'EC1A 1BB', country: 'United Kingdom',
   };
   return {
-    number: db.settings.prefix + db.settings.nextNumber, issueDate: today(), dueDate: addDays(today(), db.settings.dueDays),
+    number: nextNumber(), issueDate: today(), dueDate: addDays(today(), db.settings.dueDays),
     client, reference: '', status: 'draft',
     items: [
       { id: uid(), name: 'Design work', description: 'Concepts and two rounds of revisions', qty: 8, unit: 'hrs', price: 45 },

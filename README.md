@@ -18,6 +18,10 @@ backend, no server — your invoices, clients and prices are stored only on the 
 - **Send by email** — on iPhone, *Share PDF via Mail* opens the share sheet with the PDF
   attached (the client's address is copied so you can paste it into "To"). There's also a
   plain *Open in Mail* option and *Save PDF*.
+- **One-tap sending from Gmail** (optional) — sign in with Google once and invoices are sent
+  from your own Gmail address with the PDF attached, straight from the app. Runs entirely in
+  the browser via Google sign-in + the Gmail API (send-only permission); see *Gmail setup* below.
+- **Invoice numbers** like `ABC 0001` — choose the prefix, number of digits and next number.
 - **Import past invoices → automatic prices** — import old invoices from PDF, CSV, pasted text,
   or type them in. Every item and its price goes into your **price book**; when you type an
   item on a new invoice the price fills in automatically (with last-used date and average).
@@ -51,6 +55,25 @@ python3 -m http.server 8000
 
 Then open `http://<your-computer's-IP>:8000` in Safari on the iPhone. (Offline mode needs
 https, so use Option A for everyday use.)
+
+## Gmail setup (one-time, ~5 minutes)
+
+Google requires each app that sends Gmail to have its own OAuth **Client ID**:
+
+1. Open <https://console.cloud.google.com>, sign in with the Gmail account you'll send from,
+   and create a project (e.g. "Tally").
+2. Enable the **Gmail API** (search for it in the top bar → Enable).
+3. **Google Auth Platform / OAuth consent screen** → Get started → app name "Tally",
+   your email, audience **External**.
+4. **Audience → Test users** → add your own Gmail address.
+5. **Clients → Create client → Web application**. Under *Authorised JavaScript origins* add the
+   address the app is served from, e.g. `https://karolpasko.github.io`.
+6. Copy the Client ID into **More → Business & invoice settings → Send from Gmail** and tap
+   **Connect Gmail**. Google will warn that the app isn't verified — that's expected for your own
+   private app; tap *Continue* and allow *Send email on your behalf*.
+
+Google's sign-in lasts about an hour; after that, tapping *Send with Gmail* just asks you to
+pick your account again.
 
 ## Your data
 

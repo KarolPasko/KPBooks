@@ -11,8 +11,10 @@ const defaultSettings = () => ({
   },
   currency: 'GBP',
   locale: 'en-GB',
-  prefix: 'INV-',
-  nextNumber: 1001,
+  prefix: 'INV',
+  numberDigits: 4,
+  nextNumber: 1,
+  gmailClientId: '',
   dueDays: 14,
   taxRate: 0,
   notes: 'Thank you for your business!',
@@ -108,12 +110,18 @@ export function findClientByName(name, email) {
 // ---- Invoices ----
 export const getInvoice = (id) => db.invoices.find((i) => i.id === id) || null;
 
+// "ABC" + 1 -> "ABC 0001". A prefix ending in "-", "/", "_" or a space is used as-is ("INV-0001").
+export function formatNumber(n, prefix = db.settings.prefix, digits = db.settings.numberDigits) {
+  const p = String(prefix || '');
+  const sep = p && /[A-Za-z0-9]$/.test(p) ? ' ' : '';
+  return p + sep + String(Math.max(0, Math.floor(num(n)))).padStart(Math.max(1, num(digits) || 1), '0');
+}
+
 export function nextNumber() {
-  const s = db.settings;
-  let n = num(s.nextNumber) || 1;
+  let n = num(db.settings.nextNumber) || 1;
   const taken = new Set(db.invoices.map((i) => i.number));
-  while (taken.has(s.prefix + n)) n++;
-  return s.prefix + n;
+  while (taken.has(formatNumber(n))) n++;
+  return formatNumber(n);
 }
 
 export function newInvoice(partial = {}) {
@@ -155,7 +163,7 @@ export function upsertInvoice(inv) {
     db.invoices.push(inv);
     // bump the counter past the number we just used
     const m = String(inv.number).match(/(\d+)\s*$/);
-    if (m && String(inv.number).startsWith(db.settings.prefix) && +m[1] >= num(db.settings.nextNumber)) {
+    if (m && String(inv.number).startsWith(String(db.settings.prefix).trim()) && +m[1] >= num(db.settings.nextNumber)) {
       db.settings.nextNumber = +m[1] + 1;
     }
   }
